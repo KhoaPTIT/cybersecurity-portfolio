@@ -1,0 +1,571 @@
+# DCT Geo Defense
+
+Bài thực hành Labtainer về **phòng thủ kỹ thuật giấu tin trong ảnh DCT trước tấn công hình học**.
+
+Chủ đề chính:
+
+- Giấu tin trong ảnh bằng DCT block 8x8.
+- Đánh giá PSNR và BER.
+- Khảo sát ảnh hưởng của geometric attack.
+- Thiết kế defense bằng geometric resynchronization.
+- Viết plan và memo dựa trên bằng chứng thực nghiệm.
+
+---
+
+# Mục tiêu
+
+Sau khi hoàn thành bài lab, sinh viên có thể:
+
+- Hiểu cách nhúng thông điệp vào ảnh bằng DCT.
+- Hiểu ảnh hưởng của `ALPHA` và `REPEAT_N` tới PSNR, BER và robustness.
+- Phân tích tác động của translation, crop, rotation, scaling và composite attack.
+- Nhận biết nguyên nhân geometric attack làm mất đồng bộ block DCT.
+- Tự chọn tham số phòng thủ dựa trên báo cáo benchmark.
+- Cấu hình và chạy resynchronization defense.
+- Đánh giá hiệu quả defense bằng cả số liệu và hình ảnh trực quan.
+- Viết báo cáo ngắn giải thích quyết định kỹ thuật, kết quả đạt được và rủi ro còn lại.
+
+---
+
+# Kiến thức chính
+
+## 1. DCT Watermarking
+
+Trong bài lab, ảnh được xử lý theo từng block 8x8. Thông điệp được nhúng vào miền tần số bằng DCT.
+
+Ý tưởng chính là thay đổi một số hệ số DCT sao cho bit thông điệp có thể được đọc lại khi trích xuất.
+
+Các tham số quan trọng:
+
+```text
+ALPHA    : cường độ nhúng watermark
+REPEAT_N : số lần lặp bit để tăng khả năng khôi phục
+```
+
+`ALPHA` càng cao thì watermark thường bền hơn, nhưng ảnh stego dễ bị méo hơn và PSNR giảm.
+
+`REPEAT_N` càng cao thì khả năng sửa lỗi tốt hơn, nhưng dung lượng thông điệp giảm và thời gian xử lý tăng.
+
+---
+
+## 2. PSNR và BER
+
+Lab sử dụng hai chỉ số chính:
+
+```text
+PSNR: đo mức độ giống nhau giữa ảnh gốc và ảnh stego
+BER : Bit Error Rate, đo tỷ lệ bit khôi phục sai
+```
+
+Mục tiêu của defense là giữ PSNR đủ cao, đồng thời giảm BER sau tấn công hình học.
+
+Điều kiện quan trọng trong bài lab:
+
+```text
+PSNR >= 35 dB
+Defense BER <= 15%
+```
+
+---
+
+## 3. Geometric Attack
+
+Geometric attack làm thay đổi vị trí hoặc cấu trúc không gian của ảnh. Điều này khiến quá trình trích xuất đọc sai ranh giới block DCT ban đầu.
+
+Các dạng attack được benchmark trong lab:
+
+- Translation
+- Crop
+- Rotation
+- Scaling
+- Composite attack
+
+Trong đó, composite attack là trường hợp tổng hợp nhiều biến đổi hình học, thường gây khó khăn nhất cho quá trình khôi phục watermark.
+
+---
+
+## 4. Geometric Resynchronization Defense
+
+Defense trong bài lab hoạt động bằng cách thử nhiều giả thuyết hình học để tìm cấu hình khôi phục tốt nhất.
+
+Các nhóm tham số chính:
+
+```python
+SEARCH_RADIUS
+ROTATION_CANDIDATES
+SCALE_CANDIDATES
+ALPHA
+REPEAT_N
+```
+
+Sinh viên phải tự viết `DEFENSE_PLAN.md`, sau đó sinh hoặc sửa `defense_config.py`, rồi chạy `registration_defense.py` để kiểm tra hiệu quả.
+
+---
+
+# Tải bài lab
+
+```bash
+imodule https://github.com/KhoaPTIT/dct-geo-defense/raw/master/dct-geo-defense.tar
+```
+
+---
+
+# Khởi động bài lab
+
+```bash
+labtainer dct-geo-defense
+```
+
+Nếu đang phát triển hoặc chỉnh sửa lab, có thể rebuild:
+
+```bash
+rebuild dct-geo-defense
+```
+
+---
+
+# Nội dung thực hành
+
+## Task 1 — Tạo ảnh, nhúng DCT, xem PSNR và phổ DCT
+
+Task này tạo ảnh cover, nhúng thông điệp bằng DCT, tạo ảnh stego và sinh phổ DCT để sinh viên quan sát.
+
+Chạy:
+
+```bash
+python3 calibrate_dct_defense.py --alpha 35 --repeat 5
+eog cover.png &
+eog stego.png &
+eog dct_spectrum_before.png &
+cat embed_report.txt
+```
+
+Sinh viên cần quan sát:
+
+- `cover.png`: ảnh gốc.
+- `stego.png`: ảnh sau khi nhúng thông điệp.
+- `dct_spectrum_before.png`: phổ DCT để quan sát phân bố năng lượng.
+- PSNR trong `embed_report.txt`.
+- BER baseline khi chưa có attack.
+
+Kết quả checkwork:
+
+```text
+Y - task1_calibrate
+```
+
+Marker được kiểm tra:
+
+```text
+Defense embedding calibration completed
+```
+
+---
+
+## Task 2 — Sweep tham số để chọn trade-off
+
+Task này chạy nhiều tổ hợp `ALPHA` và `REPEAT_N` để đánh giá trade-off giữa chất lượng ảnh và khả năng chống attack.
+
+Chạy:
+
+```bash
+python3 parameter_sweep.py --alphas 25,35,45,55 --repeats 3,5,7
+cat sweep_report.txt
+```
+
+Sinh viên cần đọc `sweep_report.txt` và chọn cấu hình hợp lý.
+
+Gợi ý chọn cấu hình:
+
+- PSNR không quá thấp.
+- Clean BER tốt.
+- Composite BER không quá cao.
+- `REPEAT_N` đủ lớn để tăng khả năng sửa lỗi.
+- `ALPHA` không quá nhỏ để watermark đủ bền.
+
+Kết quả checkwork:
+
+```text
+Y - task2_sweep
+```
+
+Marker được kiểm tra:
+
+```text
+Parameter sweep completed
+```
+
+---
+
+## Task 3 — Tạo benchmark hình học cho phòng thủ
+
+Task này tạo bộ benchmark gồm nhiều geometric attack để đánh giá mức độ suy giảm watermark.
+
+Chạy:
+
+```bash
+python3 build_geometric_benchmark.py
+ls attacks
+eog attacks/composite_attacked.png &
+cat benchmark_report.txt
+```
+
+Có thể xem thêm các report chi tiết:
+
+```bash
+cat translation_report.txt
+cat crop_report.txt
+cat rotation_report.txt
+cat scaling_report.txt
+cat composite_report.txt
+```
+
+Sinh viên cần xác định:
+
+- Attack nào làm BER tăng mạnh nhất.
+- Composite attack ảnh hưởng thế nào tới block alignment.
+- Defense cần ưu tiên bù translation, rotation, scale hay nhiều yếu tố cùng lúc.
+
+Kết quả checkwork:
+
+```text
+Y - task3_benchmark
+```
+
+Marker được kiểm tra:
+
+```text
+Geometric defense benchmark completed
+```
+
+---
+
+## Task 4 — Viết defense plan thật
+
+Task này yêu cầu sinh viên tự viết kế hoạch phòng thủ, không được để nguyên placeholder `TODO`.
+
+Mở file:
+
+```bash
+nano DEFENSE_PLAN.md
+```
+
+Các dòng tham số cần có dạng:
+
+```text
+ALPHA = 35.0
+REPEAT_N = 5
+SEARCH_RADIUS = 8
+ROTATION_CANDIDATES = [-5, -3, -1, 0, 1, 3, 5]
+SCALE_CANDIDATES = [0.90, 0.95, 1.0, 1.05, 1.10]
+HARDEST_TRANSFORM = composite
+```
+
+Sau khi sửa xong, validate:
+
+```bash
+python3 validate_defense_plan.py
+cat plan_report.txt
+```
+
+Yêu cầu để plan được chấp nhận:
+
+- Xóa toàn bộ `TODO`.
+- Nội dung đủ dài, không viết quá sơ sài.
+- Đã chạy `parameter_sweep.py`.
+- Đã chạy `build_geometric_benchmark.py`.
+- `ALPHA` nằm trong khoảng 25 đến 60.
+- `REPEAT_N` tối thiểu là 5.
+- `SEARCH_RADIUS` tối thiểu là 8.
+- `ROTATION_CANDIDATES` là list Python, có nhiều góc và có chứa `0`.
+- `SCALE_CANDIDATES` là list Python, có giá trị gần `0.90`.
+- `HARDEST_TRANSFORM` là một trong các giá trị:
+  - `translation`
+  - `crop`
+  - `rotation`
+  - `scaling`
+  - `composite`
+
+Kết quả checkwork:
+
+```text
+Y - task4_plan
+```
+
+Marker được kiểm tra:
+
+```text
+Defense plan accepted
+```
+
+---
+
+## Task 5 — Chuyển plan thành config và kiểm tra lại
+
+Task này đọc `DEFENSE_PLAN.md`, sinh ra `defense_config.py`, sau đó sinh viên kiểm tra hoặc sửa lại cấu hình nếu cần.
+
+Chạy:
+
+```bash
+python3 apply_plan_to_config.py
+nano defense_config.py
+cat config_report.txt
+```
+
+File `defense_config.py` sẽ chứa các tham số chính:
+
+```python
+ALPHA = 35.0
+REPEAT_N = 5
+SEARCH_RADIUS = 8
+ROTATION_CANDIDATES = [-5, -3, -1, 0, 1, 3, 5]
+SCALE_CANDIDATES = [0.90, 0.95, 1.0, 1.05, 1.10]
+```
+
+Sinh viên có thể chỉnh lại nếu defense chưa đạt yêu cầu.
+
+Kết quả checkwork:
+
+```text
+Y - task5_config
+```
+
+Marker được kiểm tra:
+
+```text
+Defense config generated from plan
+```
+
+---
+
+## Task 6 — Chạy phòng thủ tái đồng bộ
+
+Task này chạy cơ chế geometric resynchronization defense.
+
+Chạy:
+
+```bash
+python3 registration_defense.py
+cat defense_report.txt
+eog defended.png &
+```
+
+Script sẽ thử nhiều cấu hình scale, rotation và translation để tìm candidate có BER thấp nhất.
+
+Điều kiện pass quan trọng:
+
+```text
+PSNR >= 35 dB
+Defense BER <= 15%
+REPEAT_N >= 5
+25 <= ALPHA <= 60
+SEARCH_RADIUS >= 8
+Student defense parameters changed: YES
+```
+
+Nếu defense fail:
+
+1. Mở lại `DEFENSE_PLAN.md`.
+2. Tăng hoặc điều chỉnh `SEARCH_RADIUS`.
+3. Mở rộng `ROTATION_CANDIDATES`.
+4. Thử thêm `SCALE_CANDIDATES`.
+5. Chạy lại:
+
+```bash
+python3 apply_plan_to_config.py
+python3 registration_defense.py
+cat defense_report.txt
+```
+
+Kết quả checkwork:
+
+```text
+Y - task6_defense
+```
+
+Marker được kiểm tra:
+
+```text
+Geometric resynchronization defense PASSED
+```
+
+---
+
+## Task 7 — Tạo bằng chứng trực quan
+
+Task này tạo ảnh tổng hợp để so sánh trực quan giữa cover, stego, ảnh bị attack và ảnh sau defense.
+
+Chạy:
+
+```bash
+python3 visualize_defense.py
+eog defense_contact_sheet.png &
+cat visual_defense_report.txt
+```
+
+Sinh viên cần quan sát:
+
+- Ảnh trước attack.
+- Ảnh sau composite attack.
+- Ảnh sau defense.
+- Khác biệt trực quan giữa các ảnh.
+- Defense có khôi phục alignment tốt hơn không.
+
+Kết quả checkwork:
+
+```text
+Y - task7_visual
+```
+
+Marker được kiểm tra:
+
+```text
+Defense visual comparison completed
+```
+
+---
+
+## Task 8 — Viết memo phân tích kết quả
+
+Task này yêu cầu sinh viên viết memo sau khi đã có defense report và ảnh trực quan.
+
+Mở file:
+
+```bash
+nano DEFENSE_MEMO.md
+```
+
+Memo cần đủ 4 mục:
+
+```text
+Visual Evidence
+Quantitative Evidence
+What I Changed
+Residual Risk
+```
+
+Sau đó validate:
+
+```bash
+python3 validate_defense_memo.py
+cat memo_report.txt
+```
+
+Yêu cầu để memo được chấp nhận:
+
+- Xóa toàn bộ `TODO`.
+- Nội dung đủ dài, không viết quá ngắn.
+- Mỗi mục phải có phân tích cụ thể.
+- Có nhắc đến bằng chứng hình ảnh.
+- Có nhắc đến PSNR và Defense BER từ `defense_report.txt`.
+- Có mô tả đã thay đổi gì trong `defense_config.py`.
+- Có nêu ít nhất một rủi ro còn lại.
+
+Kết quả checkwork:
+
+```text
+Y - task8_memo
+```
+
+Marker được kiểm tra:
+
+```text
+Defense memo accepted
+```
+
+---
+
+## Task 9 — Tổng kết và checkwork
+
+Task cuối tạo báo cáo tổng hợp và chạy checkwork.
+
+Chạy:
+
+```bash
+python3 summary.py
+cat summary_report.txt
+checkwork
+```
+
+`summary_report.txt` sẽ tổng hợp:
+
+- PSNR.
+- Clean BER.
+- Translation stress BER.
+- Crop stress BER.
+- Rotation stress BER.
+- Scaling stress BER.
+- Composite stress BER.
+- Defense BER.
+- Trạng thái plan.
+- Trạng thái memo.
+- Trạng thái visual sheet.
+
+Kết quả checkwork:
+
+```text
+Y - task9_summary
+```
+
+Marker được kiểm tra:
+
+```text
+Summary Completed
+```
+
+---
+
+# Checkwork
+
+Sau khi hoàn thành đầy đủ, chạy:
+
+```bash
+checkwork
+```
+
+Kết quả mong đợi:
+
+```text
+Labname dct-geo-defense
+
+Y - task1_calibrate
+Y - task2_sweep
+Y - task3_benchmark
+Y - task4_plan
+Y - task5_config
+Y - task6_defense
+Y - task7_visual
+Y - task8_memo
+Y - task9_summary
+```
+
+
+---
+
+# Dừng lab
+
+Sau khi hoàn thành:
+
+```bash
+stoplab dct-geo-defense
+```
+
+Kết quả checkwork sẽ được lưu trong:
+
+```text
+~/labtainer_xfer/dct-geo-defense
+```
+
+---
+
+# Thông tin học phần
+
+Hoàng Anh Khoa — B22DCAT164
+
+Lớp: D22CQAT04-B
+
+Học phần: Kỹ thuật giấu tin (INT14102)
+
+Học viện Công nghệ Bưu chính Viễn thông (PTIT)
+
+Giảng viên hướng dẫn: PGS.TS. Đỗ Xuân Chợ
